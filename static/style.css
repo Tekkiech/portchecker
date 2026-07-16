@@ -39,7 +39,7 @@
 :root {
   --bg: #05070d;
   --bg-1: #0a0e18;
-  --card: rgba(255, 255, 255, 0.035);
+  --card: rgba(14, 19, 34, 0.68);
   --card-solid: #0d1220;
   --border: rgba(255, 255, 255, 0.09);
   --border-strong: rgba(255, 255, 255, 0.16);
@@ -128,6 +128,14 @@ body {
   overflow-x: hidden;
 }
 
+/*
+ * #bg-canvas and .grain are fixed full-viewport layers that animate
+ * independently of scrolling. Promoting them to their own compositor layer
+ * (will-change + translateZ) means the browser can composite scroll without
+ * re-rasterizing them, and — combined with dropping backdrop-filter from
+ * everything above them — without re-blurring a moving animated canvas on
+ * every scroll frame, which is what caused the scroll jank.
+ */
 #bg-canvas {
   position: fixed;
   inset: 0;
@@ -136,6 +144,8 @@ body {
   z-index: 0;
   pointer-events: none;
   opacity: 0.55;
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 .grain {
@@ -146,6 +156,8 @@ body {
   opacity: 0.035;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 @media (prefers-color-scheme: light) {
@@ -156,6 +168,16 @@ header, main, footer { position: relative; z-index: 2; }
 
 /* ---------- Topbar ---------- */
 .topbar {
+  /*
+   * position: sticky makes this the one deliberate backdrop-filter user on
+   * the page — it blurs whatever scrolls underneath a single fixed element,
+   * the classic cheap use of backdrop-filter. Every other card below had
+   * its own blur removed because scrolling *those* past the animated
+   * canvas forced a re-blur of a moving target on every single frame.
+   */
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -163,6 +185,7 @@ header, main, footer { position: relative; z-index: 2; }
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
   gap: 14px;
+  background: var(--card);
   backdrop-filter: blur(16px);
 }
 
@@ -297,10 +320,13 @@ header, main, footer { position: relative; z-index: 2; }
   font-family: var(--ff-body);
   cursor: pointer;
   transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
-  backdrop-filter: blur(8px);
 }
 
 .btn-ghost:hover { border-color: var(--accent-1); color: var(--text); }
+.btn:focus-visible, .tab:focus-visible, .segmented-opt:focus-visible, thead th:focus-visible {
+  outline: 2px solid var(--accent-1);
+  outline-offset: 2px;
+}
 .btn:active { transform: scale(0.96); }
 .btn-sm { padding: 6px 12px; font-size: 12px; }
 
@@ -361,6 +387,12 @@ main {
   color: var(--warn);
 }
 
+.banner-bad {
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  color: var(--bad);
+}
+
 .hidden { display: none !important; }
 
 /* ---------- Stats ---------- */
@@ -376,9 +408,9 @@ main {
   border-radius: var(--radius-md);
   padding: 18px 20px;
   box-shadow: var(--shadow-card);
-  backdrop-filter: blur(20px);
   position: relative;
   overflow: hidden;
+  contain: layout paint style;
   transition: transform 0.25s ease, border-color 0.25s ease;
 }
 
@@ -424,7 +456,7 @@ main {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-glow);
   padding: 24px clamp(18px, 3vw, 28px);
-  backdrop-filter: blur(20px);
+  contain: layout paint style;
 }
 
 .card-header h3 {
@@ -612,6 +644,7 @@ main {
   border-radius: var(--radius-md);
   overflow: hidden;
   background: rgba(255, 255, 255, 0.015);
+  contain: layout paint style;
 }
 
 .group-header {
@@ -625,6 +658,7 @@ main {
 }
 
 .group-header:hover { background: rgba(255, 255, 255, 0.03); }
+.group-header:focus-visible { outline: 2px solid var(--accent-1); outline-offset: -2px; }
 
 .group-chevron {
   width: 18px;
@@ -776,6 +810,7 @@ tbody tr:hover { background: rgba(91, 140, 255, 0.05); }
   border-radius: var(--radius-md);
   overflow: hidden;
   background: rgba(255, 255, 255, 0.015);
+  contain: layout paint style;
 }
 
 .container-card + .container-card { margin-top: 10px; }
@@ -791,6 +826,7 @@ tbody tr:hover { background: rgba(91, 140, 255, 0.05); }
 }
 
 .container-header:hover { background: rgba(255, 255, 255, 0.03); }
+.container-header:focus-visible { outline: 2px solid var(--accent-1); outline-offset: -2px; }
 
 .container-name {
   font-family: var(--ff-display);
@@ -842,6 +878,11 @@ footer {
   font-size: 12px;
   color: var(--text-dimmer);
   border-top: 1px solid var(--border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-dot { animation: none; }
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
 
 @media (max-width: 640px) {

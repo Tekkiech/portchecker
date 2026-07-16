@@ -11,20 +11,39 @@ if (!canvas) {
   if (prefersReducedMotion || (isSmallScreen && isCoarsePointer)) {
     canvas.remove();
   } else {
-    initScene(canvas);
+    try {
+      initScene(canvas);
+    } catch (err) {
+      // WebGL can be unavailable or disabled (old browser, remote/virtual
+      // display, low-power mode) — fail quietly rather than break the page.
+      console.warn("Port Checker: background animation disabled —", err.message);
+      canvas.remove();
+    }
   }
 }
 
 function initScene(canvas) {
+  // Rendering at a lower internal resolution than the CSS size (and letting
+  // the GPU upscale) cuts fragment-shader work substantially for an ambient,
+  // already-blurred-looking background — the softness costs nothing visually
+  // here but saves real GPU time, which matters on the low-power/remote
+  // clients this dashboard is often viewed from.
+  const RENDER_SCALE = 0.6;
+
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
   camera.position.z = 22;
 
-  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  const renderer = new THREE.WebGLRenderer({
+    canvas,
+    alpha: true,
+    antialias: false,
+    powerPreference: "low-power",
+  });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
+  renderer.setSize(window.innerWidth * RENDER_SCALE, window.innerHeight * RENDER_SCALE, false);
 
-  const COUNT = window.innerWidth < 1100 ? 60 : 110;
+  const COUNT = window.innerWidth < 1100 ? 45 : 80;
   const SPREAD = 26;
   const positions = new Float32Array(COUNT * 3);
   const velocities = [];
@@ -72,7 +91,7 @@ function initScene(canvas) {
   window.addEventListener("mousemove", (e) => {
     mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
     mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
-  });
+  }, { passive: true });
 
   function updateLines() {
     let idx = 0;
@@ -121,7 +140,10 @@ function initScene(canvas) {
     }
     pointsGeometry.attributes.position.needsUpdate = true;
 
-    if (frame % 2 === 0) updateLines();
+    // the O(n^2) link search is the priciest bit of CPU work here; running
+    // it every 3rd frame instead of every frame is imperceptible for slowly
+    // drifting points but cuts that cost by a third.
+    if (frame % 3 === 0) updateLines();
 
     camera.position.x += (mouseX * 2 - camera.position.x) * 0.02;
     camera.position.y += (-mouseY * 1.2 - camera.position.y) * 0.02;
@@ -131,9 +153,13 @@ function initScene(canvas) {
   }
   animate();
 
+  let resizeTimer = null;
   window.addEventListener("resize", () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth * RENDER_SCALE, window.innerHeight * RENDER_SCALE, false);
+    }, 150);
+  }, { passive: true });
 }
