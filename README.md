@@ -11,6 +11,17 @@ A small self-hosted dashboard for ZimaOS (or any Docker host) that shows:
 - A **quick check** ("is port 8080 free?") and a **free-port finder** for a
   range, so you stop hitting `port is already allocated` when installing a
   new container.
+- Ports and containers are grouped into **collapsible sections** (Docker
+  Containers / Host Services, and one card per container) with per-group
+  "show more" paging, so the page stays short even with a hundred open
+  ports or a few dozen containers.
+
+The UI is a glassmorphic dark dashboard with a lightweight Three.js
+particle-network background and GSAP-driven entrances/accordions/counters.
+GSAP, Three.js, and the two typefaces (Inter, Space Grotesk) are vendored
+under `static/vendor/` and `static/fonts/` — no CDN calls and no build step,
+so it works offline behind a Cloudflare Tunnel with nothing to `npm install`
+on the read-only host.
 
 It runs entirely as a container itself and never writes to the host
 filesystem — nothing to worry about with ZimaOS's read-only root. Docker's

@@ -33,6 +33,13 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/favicon.ico")
+def favicon():
+    # the tab icon is an inline data: URI in index.html; this just quiets
+    # browsers' legacy fallback request for /favicon.ico
+    return "", 204
+
+
 @app.route("/api/ports")
 def api_ports():
     rows, containers, docker_error = portscan.build_port_table()
