@@ -34,15 +34,21 @@ rest of the OS is locked down.
 
 The container shares the host's **network namespace** (`network_mode:
 host`) and **PID namespace** (`pid: host`), gets a read-only mount of
-`/var/run/docker.sock`, and adds the **`SYS_PTRACE`** capability. That lets it:
+`/var/run/docker.sock`, adds the **`SYS_PTRACE`** capability, and runs with
+**AppArmor confinement disabled** (`security_opt: apparmor:unconfined`).
+That lets it:
 
 1. Run `ss -tlnp` / `ss -ulnp` to list every listening socket on the host,
    with the owning process name/PID (this also catches container ports —
    Docker's `docker-proxy` process shows up here for published ports).
    Attributing a socket to a process means reading that process's
    `/proc/<pid>/fd` entries, which the kernel gates behind `CAP_SYS_PTRACE`
-   regardless of running as root — without it, every row shows up as
-   "unknown" instead of a process name.
+   regardless of running as root. That alone isn't enough, though — Docker's
+   default AppArmor profile additionally only allows that kind of read
+   between two processes running under the *same* profile, so it still
+   blocks reading host processes (which run unconfined or under their own
+   profiles) even with the capability granted. Skip either one and every
+   row shows up as "unknown" instead of a process name.
 2. Query the Docker API for each container's published port bindings and
    image name.
 3. Merge the two: a listening port is labeled with the container that
@@ -64,9 +70,10 @@ No data is persisted; every request re-scans live state.
    Alternatively, if your ZimaOS App Store build supports "Install a
    Customized App" / compose-based custom installs, you can paste the
    contents of `docker-compose.yml` there instead of using SSH — just make
-   sure `network_mode: host`, `pid: host`, the `cap_add: [SYS_PTRACE]`
-   entry, and the `docker.sock` volume mount survive the import, since the
-   GUI form doesn't always expose those fields.
+   sure `network_mode: host`, `pid: host`, the `cap_add: [SYS_PTRACE]` and
+   `security_opt: [apparmor:unconfined]` entries, and the `docker.sock`
+   volume mount survive the import, since the GUI form doesn't always
+   expose those fields.
 
 2. On the ZimaOS host:
    ```bash
