@@ -50,6 +50,16 @@ No data is persisted; every request re-scans live state.
    docker compose up -d --build
    ```
 
+   If this fails with `mkdir /root/.docker: read-only file system`, the
+   Docker CLI is trying to create its config/cache directory under `$HOME`
+   (`/root` when you're root), which is also on the read-only partition.
+   Point it at a writable directory instead:
+   ```bash
+   export DOCKER_CONFIG=/DATA/AppData/portchecker/.docker
+   mkdir -p "$DOCKER_CONFIG"
+   docker compose up -d --build
+   ```
+
 3. The dashboard is now on **port 8420** on the host itself (because of
    `network_mode: host`, the compose file doesn't need a `ports:` mapping —
    it's already bound directly to the host IP):
