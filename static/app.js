@@ -484,6 +484,8 @@
     }
   }
 
+  const FREE_PORTS_FETCH_LIMIT = 100;
+
   async function findFreePorts() {
     const start = $("#range-start").value || 8000;
     const end = $("#range-end").value || 9000;
@@ -491,11 +493,15 @@
     const resultEl = $("#free-ports-result");
     resultEl.textContent = "Searching...";
     try {
-      const data = await fetchJSON(`/api/free-ports?start=${start}&end=${end}&proto=${proto}&limit=15`);
+      const data = await fetchJSON(`/api/free-ports?start=${start}&end=${end}&proto=${proto}&limit=${FREE_PORTS_FETCH_LIMIT}`);
       if (data.error) { resultEl.textContent = `Error: ${data.error}`; return; }
       if (!data.free_ports.length) { resultEl.textContent = "No free ports found in that range."; return; }
-      resultEl.innerHTML = data.free_ports.map((p) => `<span class="pill">${p}</span>`).join(" ");
-      if (gsapAvailable) gsap.from($$(".pill", resultEl), { opacity: 0, y: -6, duration: 0.25, stagger: 0.02 });
+      const truncated = data.free_ports.length >= FREE_PORTS_FETCH_LIMIT;
+      resultEl.innerHTML = `
+        <div class="pill-strip">${data.free_ports.map((p) => `<span class="pill">${p}</span>`).join("")}</div>
+        ${truncated ? `<div class="pill-strip-note">Showing the first ${FREE_PORTS_FETCH_LIMIT} — narrow the range for a shorter list.</div>` : ""}
+      `;
+      if (gsapAvailable) gsap.from($$(".pill", resultEl), { opacity: 0, y: -6, duration: 0.25, stagger: 0.015 });
     } catch (err) {
       resultEl.textContent = `Error: ${err.message}`;
     }
