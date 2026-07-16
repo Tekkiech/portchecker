@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Port Checker · ZimaOS</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <h1>Port Checker</h1>
+      <span class="brand-sub">ZimaOS</span>
+    </div>
+    <div class="topbar-actions">
+      <span id="last-updated" class="last-updated">—</span>
+      <label class="switch">
+        <input type="checkbox" id="auto-refresh" checked>
+        <span>Auto-refresh</span>
+      </label>
+      <button id="refresh-btn" class="btn">Refresh</button>
+    </div>
+  </header>
+
+  <div id="docker-warning" class="banner banner-warn hidden"></div>
+
+  <main>
+    <section class="stats" id="stats"></section>
+
+    <section class="card">
+      <div class="card-header">
+        <h2>Quick port check</h2>
+        <p>See instantly whether a port is free before you spin up a new container.</p>
+      </div>
+      <div class="port-check">
+        <input type="number" id="check-port-input" placeholder="e.g. 8080" min="1" max="65535">
+        <select id="check-proto">
+          <option value="tcp">TCP</option>
+          <option value="udp">UDP</option>
+        </select>
+        <button id="check-port-btn" class="btn btn-primary">Check</button>
+        <div id="check-result" class="check-result"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <h2>Find a free port</h2>
+        <p>Get the next available ports in a range, for your next container.</p>
+      </div>
+      <div class="port-check">
+        <input type="number" id="range-start" placeholder="Start" value="8000">
+        <input type="number" id="range-end" placeholder="End" value="9000">
+        <select id="range-proto">
+          <option value="tcp">TCP</option>
+          <option value="udp">UDP</option>
+        </select>
+        <button id="find-free-btn" class="btn btn-primary">Find</button>
+      </div>
+      <div id="free-ports-result" class="free-ports"></div>
+    </section>
+
+    <section class="card">
+      <div class="tabs">
+        <button class="tab active" data-tab="ports">All Listening Ports</button>
+        <button class="tab" data-tab="containers">By Container</button>
+      </div>
+
+      <div class="tab-panel active" id="panel-ports">
+        <div class="table-toolbar">
+          <input type="search" id="ports-search" placeholder="Filter by port, container, image, process...">
+        </div>
+        <div class="table-wrap">
+          <table id="ports-table">
+            <thead>
+              <tr>
+                <th data-sort="port">Port</th>
+                <th data-sort="proto">Proto</th>
+                <th data-sort="owner_type">Type</th>
+                <th data-sort="owner">Owner</th>
+                <th data-sort="detail">Detail</th>
+                <th data-sort="address">Bound address</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="panel-containers">
+        <div class="table-toolbar">
+          <input type="search" id="containers-search" placeholder="Filter by name, image...">
+        </div>
+        <div class="table-wrap">
+          <table id="containers-table">
+            <thead>
+              <tr>
+                <th data-sort="name">Container</th>
+                <th data-sort="image">Image</th>
+                <th data-sort="status">Status</th>
+                <th data-sort="published">Published ports</th>
+                <th data-sort="internal">Internal-only ports</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Port Checker for ZimaOS — reads host sockets + Docker, writes nothing to disk.</span>
+  </footer>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
