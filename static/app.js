@@ -1,6 +1,8 @@
 (() => {
   const ROWS_PAGE_SIZE = 10;
   const gsapAvailable = typeof window.gsap !== "undefined";
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const animationsEnabled = gsapAvailable && !prefersReducedMotion;
 
   const state = {
     ports: [],
@@ -10,11 +12,14 @@
     rangeProto: "tcp",
     autoRefresh: true,
     firstRender: true,
+    refreshInFlight: false,
     collapsedGroups: new Set(),          // port groups the user collapsed (default: none, i.e. expanded)
     collapsedContainers: new Set(),      // container cards collapsed by name (default: all, filled in on first render)
-    containersInitialized: false,
+    knownContainerNames: new Set(),      // names seen so far, so newly-appeared containers also default to collapsed
     visibleCounts: {},                   // group key -> how many rows currently shown
     statValues: {},                      // stat key -> last rendered numeric value, for count-up deltas
+    lastPortsSignature: null,
+    lastContainersSignature: null,
   };
 
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -28,6 +33,14 @@
     return String(str ?? "").replace(/[&<>"']/g, (c) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
     }[c]));
+  }
+
+  function debounce(fn, wait) {
+    let timer = null;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), wait);
+    };
   }
 
   function ownerLabel(row) {
@@ -55,9 +68,29 @@
     return res.json();
   }
 
+  /* ---------------- preferences (persisted across visits) ---------------- */
+
+  const PREF_KEYS = { autoRefresh: "pc_autoRefresh", activeTab: "pc_activeTab" };
+
+  function loadPreferences() {
+    try {
+      const storedAutoRefresh = localStorage.getItem(PREF_KEYS.autoRefresh);
+      if (storedAutoRefresh !== null) state.autoRefresh = storedAutoRefresh === "1";
+      return { activeTab: localStorage.getItem(PREF_KEYS.activeTab) };
+    } catch {
+      return {}; // localStorage can throw in locked-down/private-browsing contexts
+    }
+  }
+
+  function savePreference(key, value) {
+    try { localStorage.setItem(key, value); } catch { /* ignore */ }
+  }
+
   /* ---------------- refresh cycle ---------------- */
 
   async function refresh() {
+    if (state.refreshInFlight) return;
+    state.refreshInFlight = true;
     const btn = $("#refresh-btn");
     btn.disabled = true;
     try {
@@ -66,8 +99,7 @@
         fetchJSON("/api/containers"),
       ]);
 
-      state.ports = portsData.ports;
-      state.containers = containersData.containers;
+      $("#fetch-error-banner").classList.add("hidden");
 
       const warn = $("#docker-warning");
       if (!portsData.docker_available) {
@@ -77,14 +109,33 @@
         warn.classList.add("hidden");
       }
 
-      if (!state.containersInitialized) {
-        state.containers.forEach((c) => state.collapsedContainers.add(c.name));
-        state.containersInitialized = true;
-      }
+      // Newly-appeared containers default to collapsed, same as on first
+      // load; containers the user has already toggled keep their state.
+      containersData.containers.forEach((c) => {
+        if (!state.knownContainerNames.has(c.name)) {
+          state.knownContainerNames.add(c.name);
+          state.collapsedContainers.add(c.name);
+        }
+      });
+
+      // Auto-refresh fires every 10s regardless of whether anything on the
+      // host actually changed. Rebuilding the DOM (and replaying entrance
+      // animations) on every tick was a periodic jank source — skip the
+      // rebuild entirely when the fetched data is byte-for-byte the same as
+      // last time, which is the common case on a quiet box.
+      const portsSignature = JSON.stringify(portsData.ports);
+      const portsChanged = portsSignature !== state.lastPortsSignature;
+      state.lastPortsSignature = portsSignature;
+      state.ports = portsData.ports;
+
+      const containersSignature = JSON.stringify(containersData.containers);
+      const containersChanged = containersSignature !== state.lastContainersSignature;
+      state.lastContainersSignature = containersSignature;
+      state.containers = containersData.containers;
 
       renderStats(portsData.summary);
-      renderPortGroups();
-      renderContainerGroups();
+      if (portsChanged || state.firstRender) renderPortGroups();
+      if (containersChanged || state.firstRender) renderContainerGroups();
       $("#last-updated").textContent = `Updated ${fmtTime(new Date())}`;
 
       if (state.firstRender) {
@@ -92,14 +143,18 @@
         playEntrance();
       }
     } catch (err) {
-      $("#last-updated").textContent = `Error: ${err.message}`;
+      const banner = $("#fetch-error-banner");
+      banner.textContent = `Couldn't reach the server (${err.message}). Retrying automatically...`;
+      banner.classList.remove("hidden");
+      $("#last-updated").textContent = `Error at ${fmtTime(new Date())}`;
     } finally {
       btn.disabled = false;
+      state.refreshInFlight = false;
     }
   }
 
   function playEntrance() {
-    if (!gsapAvailable) return;
+    if (!animationsEnabled) return;
     gsap.set([".hero-title", ".hero-sub", ".stat-card", ".tool-card", ".table-card"], { clearProps: "opacity,transform" });
     const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
     tl.from(".hero-title", { y: 24, opacity: 0, duration: 0.6 })
@@ -138,7 +193,8 @@
       const from = state.statValues[c.key] ?? 0;
       const to = c.value;
       state.statValues[c.key] = to;
-      if (gsapAvailable) {
+      if (from === to) return;
+      if (animationsEnabled) {
         const proxy = { v: from };
         gsap.to(proxy, {
           v: to,
@@ -157,9 +213,12 @@
   /* ---------------- collapsible primitive ---------------- */
 
   function setCollapsed(rootEl, bodyEl, collapsed, animate) {
+    const header = rootEl.querySelector("[data-toggle], [data-toggle-container]");
+    if (header) header.setAttribute("aria-expanded", String(!collapsed));
+
     if (collapsed) {
       rootEl.classList.add("collapsed");
-      if (animate && gsapAvailable) {
+      if (animate && animationsEnabled) {
         gsap.to(bodyEl, {
           height: 0, duration: 0.32, ease: "power2.inOut",
           onComplete: () => { bodyEl.style.display = "none"; },
@@ -172,7 +231,7 @@
       rootEl.classList.remove("collapsed");
       bodyEl.style.display = "";
       const target = bodyEl.scrollHeight;
-      if (animate && gsapAvailable) {
+      if (animate && animationsEnabled) {
         gsap.fromTo(bodyEl, { height: 0 }, {
           height: target, duration: 0.36, ease: "power2.inOut",
           onComplete: () => { bodyEl.style.height = "auto"; },
@@ -181,6 +240,15 @@
         bodyEl.style.height = "auto";
       }
     }
+  }
+
+  function wireKeyboardToggle(header) {
+    header.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        header.click();
+      }
+    });
   }
 
   /* ---------------- ports tab (grouped by owner type) ---------------- */
@@ -268,7 +336,7 @@
 
       return `
         <div class="group ${collapsed ? "collapsed" : ""}" data-group="${groupKey}">
-          <div class="group-header" data-toggle="${groupKey}">
+          <div class="group-header" data-toggle="${groupKey}" role="button" tabindex="0" aria-expanded="${!collapsed}">
             <span class="group-icon ${g.iconClass}">${g.icon}</span>
             <span class="group-title">${g.title}</span>
             <span class="group-count">${rows.length}</span>
@@ -300,7 +368,7 @@
       renderPortGroups();
     });
 
-    if (!isFirstBuild && gsapAvailable) {
+    if (!isFirstBuild && animationsEnabled) {
       gsap.from($$(".group", containerEl), { opacity: 0, y: 8, duration: 0.3, stagger: 0.04, overwrite: "auto" });
     }
   }
@@ -315,6 +383,7 @@
         if (collapsed) collapsedSet.add(key); else collapsedSet.delete(key);
         setCollapsed(groupEl, body, collapsed, true);
       });
+      wireKeyboardToggle(header);
     });
   }
 
@@ -364,7 +433,7 @@
 
       return `
         <div class="container-card ${collapsed ? "collapsed" : ""}" data-container="${escapeHtml(c.name)}">
-          <div class="container-header" data-toggle-container="${escapeHtml(c.name)}">
+          <div class="container-header" data-toggle-container="${escapeHtml(c.name)}" role="button" tabindex="0" aria-expanded="${!collapsed}">
             <svg class="group-chevron" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
             <div class="container-meta">
               <div class="container-name">${escapeHtml(c.name)}</div>
@@ -408,9 +477,10 @@
         if (collapsed) state.collapsedContainers.add(name); else state.collapsedContainers.delete(name);
         setCollapsed(cardEl, body, collapsed, true);
       });
+      wireKeyboardToggle(header);
     });
 
-    if (!isFirstBuild && gsapAvailable) {
+    if (!isFirstBuild && animationsEnabled) {
       gsap.from($$(".container-card", containerEl), { opacity: 0, y: 8, duration: 0.3, stagger: 0.03, overwrite: "auto" });
     }
   }
@@ -478,7 +548,7 @@
         html = `<span class="pill pill-used">Port ${port}/${proto} is in use</span> by <strong>${escapeHtml(owners)}</strong>`;
       }
       resultEl.innerHTML = html;
-      if (gsapAvailable) gsap.from(resultEl.firstElementChild, { opacity: 0, y: -6, duration: 0.3 });
+      if (animationsEnabled) gsap.from(resultEl.firstElementChild, { opacity: 0, y: -6, duration: 0.3 });
     } catch (err) {
       resultEl.textContent = `Error: ${err.message}`;
     }
@@ -501,7 +571,7 @@
         <div class="pill-strip">${data.free_ports.map((p) => `<span class="pill">${p}</span>`).join("")}</div>
         ${truncated ? `<div class="pill-strip-note">Showing the first ${FREE_PORTS_FETCH_LIMIT} — narrow the range for a shorter list.</div>` : ""}
       `;
-      if (gsapAvailable) gsap.from($$(".pill", resultEl), { opacity: 0, y: -6, duration: 0.25, stagger: 0.015 });
+      if (animationsEnabled) gsap.from($$(".pill", resultEl), { opacity: 0, y: -6, duration: 0.25, stagger: 0.015 });
     } catch (err) {
       resultEl.textContent = `Error: ${err.message}`;
     }
@@ -522,7 +592,17 @@
     });
   }
 
-  function setupTabs() {
+  function setupTabs(initialTab) {
+    if (initialTab && initialTab !== "ports") {
+      const tab = $(`.tab[data-tab="${initialTab}"]`);
+      if (tab) {
+        $$(".tab").forEach((t) => t.classList.remove("active"));
+        tab.classList.add("active");
+        $$(".tab-panel").forEach((p) => p.classList.remove("active"));
+        $(`#panel-${initialTab}`).classList.add("active");
+      }
+    }
+
     $$(".tab").forEach((tab) => {
       tab.addEventListener("click", () => {
         if (tab.classList.contains("active")) return;
@@ -531,8 +611,9 @@
 
         $$(".tab").forEach((t) => t.classList.remove("active"));
         tab.classList.add("active");
+        savePreference(PREF_KEYS.activeTab, tab.dataset.tab);
 
-        if (gsapAvailable && currentPanel) {
+        if (animationsEnabled && currentPanel) {
           gsap.to(currentPanel, {
             opacity: 0, duration: 0.15, onComplete: () => {
               currentPanel.classList.remove("active");
@@ -557,18 +638,24 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
-    setupTabs();
+    const prefs = loadPreferences();
+    $("#auto-refresh").checked = state.autoRefresh;
+
+    setupTabs(prefs.activeTab);
     setupSegmented();
 
     $("#refresh-btn").addEventListener("click", refresh);
     $("#check-port-btn").addEventListener("click", checkPort);
     $("#check-port-input").addEventListener("keydown", (e) => { if (e.key === "Enter") checkPort(); });
     $("#find-free-btn").addEventListener("click", findFreePorts);
-    $("#ports-search").addEventListener("input", renderPortGroups);
-    $("#containers-search").addEventListener("input", renderContainerGroups);
+    $("#range-start").addEventListener("keydown", (e) => { if (e.key === "Enter") findFreePorts(); });
+    $("#range-end").addEventListener("keydown", (e) => { if (e.key === "Enter") findFreePorts(); });
+    $("#ports-search").addEventListener("input", debounce(renderPortGroups, 150));
+    $("#containers-search").addEventListener("input", debounce(renderContainerGroups, 150));
     $("#toggle-all-btn").addEventListener("click", toggleAllForActiveTab);
     $("#auto-refresh").addEventListener("change", (e) => {
       state.autoRefresh = e.target.checked;
+      savePreference(PREF_KEYS.autoRefresh, state.autoRefresh ? "1" : "0");
       scheduleAutoRefresh();
     });
 
