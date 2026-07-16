@@ -33,12 +33,16 @@ rest of the OS is locked down.
 ## How it works
 
 The container shares the host's **network namespace** (`network_mode:
-host`) and **PID namespace** (`pid: host`), and gets a read-only mount of
-`/var/run/docker.sock`. That lets it:
+host`) and **PID namespace** (`pid: host`), gets a read-only mount of
+`/var/run/docker.sock`, and adds the **`SYS_PTRACE`** capability. That lets it:
 
 1. Run `ss -tlnp` / `ss -ulnp` to list every listening socket on the host,
    with the owning process name/PID (this also catches container ports —
    Docker's `docker-proxy` process shows up here for published ports).
+   Attributing a socket to a process means reading that process's
+   `/proc/<pid>/fd` entries, which the kernel gates behind `CAP_SYS_PTRACE`
+   regardless of running as root — without it, every row shows up as
+   "unknown" instead of a process name.
 2. Query the Docker API for each container's published port bindings and
    image name.
 3. Merge the two: a listening port is labeled with the container that
@@ -60,9 +64,9 @@ No data is persisted; every request re-scans live state.
    Alternatively, if your ZimaOS App Store build supports "Install a
    Customized App" / compose-based custom installs, you can paste the
    contents of `docker-compose.yml` there instead of using SSH — just make
-   sure `network_mode: host`, `pid: host`, and the `docker.sock` volume
-   mount survive the import, since the GUI form doesn't always expose
-   those fields.
+   sure `network_mode: host`, `pid: host`, the `cap_add: [SYS_PTRACE]`
+   entry, and the `docker.sock` volume mount survive the import, since the
+   GUI form doesn't always expose those fields.
 
 2. On the ZimaOS host:
    ```bash
