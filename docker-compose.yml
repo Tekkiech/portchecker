@@ -1,0 +1,16 @@
+services:
+  portchecker:
+    build: .
+    image: portchecker:latest
+    container_name: portchecker
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - PORT=8420
+      # Uncomment to require a login before the dashboard loads (recommended
+      # if this is reachable through a Cloudflare Tunnel or similar):
+      # - AUTH_USERNAME=admin
+      # - AUTH_PASSWORD=change-me
