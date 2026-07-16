@@ -896,7 +896,18 @@ footer {
 
   /* stacked-card table on narrow screens instead of horizontal scroll */
   .table-wrap { overflow-x: visible; }
-  table { min-width: 0; }
+  /*
+   * table keeps `display: table` by default even though its rows/cells
+   * below are switched to block/flex — with the row/cell structure no
+   * longer matching what a table box expects, some mobile browsers fall
+   * back to the table auto-layout algorithm during reflow-heavy moments
+   * (e.g. the accordion's animated height tween), sizing the table wider
+   * than the viewport from cell content before settling back down. That
+   * transient overflow gets clipped by body's overflow-x: hidden, which
+   * is what caused text to get cut off mid-animation. Taking the table
+   * out of table layout entirely avoids the whole class of miscalculation.
+   */
+  table { display: block; min-width: 0; }
   thead { display: none; }
   tbody, tr, td { display: block; width: 100%; }
   tbody tr {

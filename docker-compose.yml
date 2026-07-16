@@ -6,6 +6,14 @@ services:
     restart: unless-stopped
     network_mode: host
     pid: host
+    # Without this, `ss -p` can only attribute a socket to a process
+    # when it can read that process's /proc/<pid>/fd entries. The kernel
+    # gates that behind CAP_SYS_PTRACE (regardless of running as root),
+    # and most hosts also have Yama's ptrace_scope restricting even
+    # same-UID access without it — so every row shows up as "unknown"
+    # otherwise.
+    cap_add:
+      - SYS_PTRACE
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:

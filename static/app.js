@@ -13,7 +13,7 @@
     autoRefresh: true,
     firstRender: true,
     refreshInFlight: false,
-    collapsedGroups: new Set(),          // port groups the user collapsed (default: none, i.e. expanded)
+    collapsedGroups: new Set(["ports-container", "ports-host"]), // port groups collapsed by default, same as container cards
     collapsedContainers: new Set(),      // container cards collapsed by name (default: all, filled in on first render)
     knownContainerNames: new Set(),      // names seen so far, so newly-appeared containers also default to collapsed
     visibleCounts: {},                   // group key -> how many rows currently shown
@@ -643,6 +643,7 @@
 
     setupTabs(prefs.activeTab);
     setupSegmented();
+    syncToggleAllLabel(); // groups start collapsed, so the button should read "Expand all"
 
     $("#refresh-btn").addEventListener("click", refresh);
     $("#check-port-btn").addEventListener("click", checkPort);
