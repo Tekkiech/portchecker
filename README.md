@@ -41,12 +41,31 @@ No data is persisted; every request re-scans live state.
    ```bash
    scp -r portchecker/ zimaos-host:/DATA/AppData/portchecker
    ```
-   (Use whichever writable data path your ZimaOS install uses for app
-   data/configs — the root filesystem being read-only doesn't affect this.)
+   `/DATA/AppData/<app-name>/` is ZimaOS's own convention for app configs
+   (it's where the App Store puts things like `/DATA/AppData/plex/config`),
+   so this stays consistent with how ZimaOS expects data to be laid out
+   even though the app itself isn't installed through the App Store.
+
+   Alternatively, if your ZimaOS App Store build supports "Install a
+   Customized App" / compose-based custom installs, you can paste the
+   contents of `docker-compose.yml` there instead of using SSH — just make
+   sure `network_mode: host`, `pid: host`, and the `docker.sock` volume
+   mount survive the import, since the GUI form doesn't always expose
+   those fields.
 
 2. On the ZimaOS host:
    ```bash
    cd /DATA/AppData/portchecker
+   docker compose up -d --build
+   ```
+
+   If this fails with `mkdir /root/.docker: read-only file system`, the
+   Docker CLI is trying to create its config/cache directory under `$HOME`
+   (`/root` when you're root), which is also on the read-only partition.
+   Point it at a writable directory instead:
+   ```bash
+   export DOCKER_CONFIG=/DATA/AppData/portchecker/.docker
+   mkdir -p "$DOCKER_CONFIG"
    docker compose up -d --build
    ```
 
