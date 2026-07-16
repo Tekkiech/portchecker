@@ -6,14 +6,19 @@ services:
     restart: unless-stopped
     network_mode: host
     pid: host
-    # Without this, `ss -p` can only attribute a socket to a process
-    # when it can read that process's /proc/<pid>/fd entries. The kernel
-    # gates that behind CAP_SYS_PTRACE (regardless of running as root),
-    # and most hosts also have Yama's ptrace_scope restricting even
-    # same-UID access without it — so every row shows up as "unknown"
-    # otherwise.
+    # Without these, `ss -p` can't attribute a socket to a process: reading
+    # another process's /proc/<pid>/fd needs CAP_SYS_PTRACE (regardless of
+    # running as root, since most hosts also have Yama's ptrace_scope
+    # restricting even same-UID access without it) - but Docker's default
+    # AppArmor profile *also* only allows ptrace-style /proc reads between
+    # processes sharing that same profile, so it still blocks reading host
+    # processes (which run unconfined or under their own profiles) even
+    # once the capability is granted. Both are needed together, or every
+    # row shows up as "unknown".
     cap_add:
       - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
