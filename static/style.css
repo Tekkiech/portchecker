@@ -148,9 +148,9 @@ body {
  * #bg-canvas and .grain are fixed full-viewport layers that animate
  * independently of scrolling. Promoting them to their own compositor layer
  * (will-change + translateZ) means the browser can composite scroll without
- * re-rasterizing them, and — combined with dropping backdrop-filter from
- * everything above them — without re-blurring a moving animated canvas on
- * every scroll frame, which is what caused the scroll jank.
+ * re-rasterizing them. Combined with dropping backdrop-filter from
+ * everything above them, that also avoids re-blurring a moving animated
+ * canvas on every scroll frame, which is what caused the scroll jank.
  */
 #bg-canvas {
   position: fixed;
@@ -186,7 +186,7 @@ header, main, footer { position: relative; z-index: 2; }
 .topbar {
   /*
    * position: sticky makes this the one deliberate backdrop-filter user on
-   * the page — it blurs whatever scrolls underneath a single fixed element,
+   * the page: it blurs whatever scrolls underneath a single fixed element,
    * the classic cheap use of backdrop-filter. Every other card below is a
    * flat opaque surface with no blur, so scrolling them past the animated
    * canvas never forces a re-blur of a moving target on every frame.
@@ -955,7 +955,7 @@ footer {
   .table-wrap { overflow-x: visible; }
   /*
    * table keeps `display: table` by default even though its rows/cells
-   * below are switched to block/flex — with the row/cell structure no
+   * below are switched to block/flex. With the row/cell structure no
    * longer matching what a table box expects, some mobile browsers fall
    * back to the table auto-layout algorithm during reflow-heavy moments
    * (e.g. the accordion's animated height tween), sizing the table wider

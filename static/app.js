@@ -120,7 +120,7 @@
 
       // Auto-refresh fires every 10s regardless of whether anything on the
       // host actually changed. Rebuilding the DOM (and replaying entrance
-      // animations) on every tick was a periodic jank source — skip the
+      // animations) on every tick was a periodic jank source, so skip the
       // rebuild entirely when the fetched data is byte-for-byte the same as
       // last time, which is the common case on a quiet box.
       const portsSignature = JSON.stringify(portsData.ports);
@@ -569,7 +569,7 @@
       const truncated = data.free_ports.length >= FREE_PORTS_FETCH_LIMIT;
       resultEl.innerHTML = `
         <div class="pill-strip">${data.free_ports.map((p) => `<span class="pill">${p}</span>`).join("")}</div>
-        ${truncated ? `<div class="pill-strip-note">Showing the first ${FREE_PORTS_FETCH_LIMIT} — narrow the range for a shorter list.</div>` : ""}
+        ${truncated ? `<div class="pill-strip-note">Showing the first ${FREE_PORTS_FETCH_LIMIT}. Narrow the range for a shorter list.</div>` : ""}
       `;
       if (animationsEnabled) gsap.from($$(".pill", resultEl), { opacity: 0, y: -6, duration: 0.25, stagger: 0.015 });
     } catch (err) {

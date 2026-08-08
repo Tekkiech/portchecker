@@ -15,8 +15,8 @@ if (!canvas) {
       initScene(canvas);
     } catch (err) {
       // WebGL can be unavailable or disabled (old browser, remote/virtual
-      // display, low-power mode) — fail quietly rather than break the page.
-      console.warn("Port Checker: background animation disabled —", err.message);
+      // display, low-power mode), so fail quietly rather than break the page.
+      console.warn("Port Checker: background animation disabled.", err.message);
       canvas.remove();
     }
   }
@@ -25,7 +25,7 @@ if (!canvas) {
 function initScene(canvas) {
   // Rendering at a lower internal resolution than the CSS size (and letting
   // the GPU upscale) cuts fragment-shader work substantially for an ambient,
-  // already-blurred-looking background — the softness costs nothing visually
+  // already-blurred-looking background. The softness costs nothing visually
   // here but saves real GPU time, which matters on the low-power/remote
   // clients this dashboard is often viewed from.
   const RENDER_SCALE = 0.6;
