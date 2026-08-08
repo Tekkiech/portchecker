@@ -101,6 +101,12 @@ No data is persisted; every request re-scans live state.
 To change the port, set `PORT` in `docker-compose.yml`'s `environment:`
 before starting it.
 
+`restart: always` means the container comes back after a crash, a `docker
+stop`, or a full host reboot — Docker itself still has to be configured to
+start on boot for that last case (`systemctl enable docker` on most Linux
+setups; on ZimaOS this is the case by default since Docker is core to the
+OS, not something you install separately).
+
 ## Exposing it remotely (Cloudflare Tunnel, etc.)
 
 Point your tunnel at `http://<zimaos-ip>:8420` (or `localhost:8420` if
