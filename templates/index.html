@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Port Checker · ZimaOS</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%235b8cff'/%3E%3Cstop offset='0.55' stop-color='%238b5cf6'/%3E%3Cstop offset='1' stop-color='%2322d3ee'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Ccircle cx='16' cy='16' r='5' fill='white'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23e2793d'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%231a0f06'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -39,77 +39,83 @@
   <div id="fetch-error-banner" class="banner banner-bad hidden"></div>
 
   <main>
-    <section class="hero">
-      <h2 class="hero-title">Every port,<br><span class="grad-text">accounted for.</span></h2>
-      <p class="hero-sub">Live visibility into every listening port on your ZimaOS box — host services and Docker containers alike — so the next install never collides.</p>
-    </section>
+    <div class="dash-rail">
+      <section class="hero">
+        <h2 class="hero-title">Every port,<br><span class="grad-text">accounted for.</span></h2>
+        <p class="hero-sub">Live visibility into every listening port on your ZimaOS box — host services and Docker containers alike — so the next install never collides.</p>
+      </section>
 
-    <section class="stats" id="stats"></section>
+      <section class="stats" id="stats"></section>
 
-    <section class="card tool-card">
-      <div class="card-header">
-        <h3>Quick port check</h3>
-        <p>See instantly whether a port is free before you spin up a new container.</p>
-      </div>
-      <div class="port-check">
-        <div class="field">
-          <input type="number" id="check-port-input" placeholder="e.g. 8080" min="1" max="65535">
-        </div>
-        <div class="segmented" data-target="check-proto">
-          <button class="segmented-opt active" data-value="tcp">TCP</button>
-          <button class="segmented-opt" data-value="udp">UDP</button>
-        </div>
-        <button id="check-port-btn" class="btn btn-primary">Check</button>
-      </div>
-      <div id="check-result" class="check-result"></div>
-    </section>
-
-    <section class="card tool-card">
-      <div class="card-header">
-        <h3>Find a free port</h3>
-        <p>Get the next available ports in a range, for your next container.</p>
-      </div>
-      <div class="port-check">
-        <div class="field field-sm"><input type="number" id="range-start" placeholder="Start" value="8000"></div>
-        <div class="field field-sm"><input type="number" id="range-end" placeholder="End" value="9000"></div>
-        <div class="segmented" data-target="range-proto">
-          <button class="segmented-opt active" data-value="tcp">TCP</button>
-          <button class="segmented-opt" data-value="udp">UDP</button>
-        </div>
-        <button id="find-free-btn" class="btn btn-primary">Find</button>
-      </div>
-      <div id="free-ports-result" class="free-ports"></div>
-    </section>
-
-    <section class="card table-card">
-      <div class="table-card-top">
-        <div class="tabs">
-          <button class="tab active" data-tab="ports">All Listening Ports</button>
-          <button class="tab" data-tab="containers">By Container</button>
-        </div>
-        <button id="toggle-all-btn" class="btn btn-ghost btn-sm">Collapse all</button>
-      </div>
-
-      <div class="tab-panel active" id="panel-ports">
-        <div class="table-toolbar">
-          <div class="search-field">
-            <svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 10-.7.7l.27.28v.79l5 5L20.49 19l-5-5zm-6 0A4.5 4.5 0 1114 9.5 4.5 4.5 0 019.5 14z"/></svg>
-            <input type="search" id="ports-search" placeholder="Filter by port, container, image, process...">
+      <div class="tools-grid">
+        <section class="card tool-card">
+          <div class="card-header">
+            <h3>Quick port check</h3>
+            <p>See instantly whether a port is free before you spin up a new container.</p>
           </div>
-        </div>
-        <div id="groups-ports" class="groups"></div>
-      </div>
-
-      <div class="tab-panel" id="panel-containers">
-        <div class="table-toolbar">
-          <div class="search-field">
-            <svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 10-.7.7l.27.28v.79l5 5L20.49 19l-5-5zm-6 0A4.5 4.5 0 1114 9.5 4.5 4.5 0 019.5 14z"/></svg>
-            <input type="search" id="containers-search" placeholder="Filter by name, image...">
+          <div class="port-check">
+            <div class="field">
+              <input type="number" id="check-port-input" placeholder="e.g. 8080" min="1" max="65535">
+            </div>
+            <div class="segmented" data-target="check-proto">
+              <button class="segmented-opt active" data-value="tcp">TCP</button>
+              <button class="segmented-opt" data-value="udp">UDP</button>
+            </div>
+            <button id="check-port-btn" class="btn btn-primary">Check</button>
           </div>
-        </div>
-        <div id="groups-containers" class="groups"></div>
+          <div id="check-result" class="check-result"></div>
+        </section>
+
+        <section class="card tool-card">
+          <div class="card-header">
+            <h3>Find a free port</h3>
+            <p>Get the next available ports in a range, for your next container.</p>
+          </div>
+          <div class="port-check">
+            <div class="field field-sm"><input type="number" id="range-start" placeholder="Start" value="8000"></div>
+            <div class="field field-sm"><input type="number" id="range-end" placeholder="End" value="9000"></div>
+            <div class="segmented" data-target="range-proto">
+              <button class="segmented-opt active" data-value="tcp">TCP</button>
+              <button class="segmented-opt" data-value="udp">UDP</button>
+            </div>
+            <button id="find-free-btn" class="btn btn-primary">Find</button>
+          </div>
+          <div id="free-ports-result" class="free-ports"></div>
+        </section>
       </div>
-    </section>
+    </div>
+
+    <div class="dash-main">
+      <section class="card table-card">
+        <div class="table-card-top">
+          <div class="tabs">
+            <button class="tab active" data-tab="ports">All Listening Ports</button>
+            <button class="tab" data-tab="containers">By Container</button>
+          </div>
+          <button id="toggle-all-btn" class="btn btn-ghost btn-sm">Collapse all</button>
+        </div>
+
+        <div class="tab-panel active" id="panel-ports">
+          <div class="table-toolbar">
+            <div class="search-field">
+              <svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 10-.7.7l.27.28v.79l5 5L20.49 19l-5-5zm-6 0A4.5 4.5 0 1114 9.5 4.5 4.5 0 019.5 14z"/></svg>
+              <input type="search" id="ports-search" placeholder="Filter by port, container, image, process...">
+            </div>
+          </div>
+          <div id="groups-ports" class="groups"></div>
+        </div>
+
+        <div class="tab-panel" id="panel-containers">
+          <div class="table-toolbar">
+            <div class="search-field">
+              <svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 10-.7.7l.27.28v.79l5 5L20.49 19l-5-5zm-6 0A4.5 4.5 0 1114 9.5 4.5 4.5 0 019.5 14z"/></svg>
+              <input type="search" id="containers-search" placeholder="Filter by name, image...">
+            </div>
+          </div>
+          <div id="groups-containers" class="groups"></div>
+        </div>
+      </section>
+    </div>
   </main>
 
   <footer>
