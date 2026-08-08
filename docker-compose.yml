@@ -3,7 +3,7 @@ services:
     build: .
     image: portchecker:latest
     container_name: portchecker
-    restart: unless-stopped
+    restart: always
     network_mode: host
     pid: host
     # Without these, `ss -p` can't attribute a socket to a process: reading
