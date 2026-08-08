@@ -1,5 +1,7 @@
 # Port Checker
 
+**[Live demo →](https://tekkiech.github.io/portchecker-demo/)** (sample data, nothing to install)
+
 A small self-hosted dashboard for ZimaOS (or any Docker host) that shows:
 
 - **Every port currently listening on the host** (TCP + UDP), not just ones
@@ -16,17 +18,17 @@ A small self-hosted dashboard for ZimaOS (or any Docker host) that shows:
   "show more" paging, so the page stays short even with a hundred open
   ports or a few dozen containers.
 
-The UI is a glassmorphic dark dashboard with a lightweight Three.js
-particle-network background and GSAP-driven entrances/accordions/counters.
-GSAP, Three.js, and the two typefaces (Inter, Space Grotesk) are vendored
-under `static/vendor/` and `static/fonts/` — no CDN calls and no build step,
-so it works offline behind a Cloudflare Tunnel with nothing to `npm install`
-on the read-only host.
+The UI is a dark dashboard with a lightweight Three.js particle-network
+background and GSAP-driven entrances/accordions/counters. GSAP, Three.js,
+and the two typefaces (Inter, Space Grotesk) are vendored under
+`static/vendor/` and `static/fonts/`. No CDN calls, no build step, so it
+works offline behind a Cloudflare Tunnel with nothing to `npm install` on
+the read-only host.
 
 It runs entirely as a container itself and never writes to the host
-filesystem — nothing to worry about with ZimaOS's read-only root. Docker's
-own build cache and image storage live on ZimaOS's writable data volume
-(wherever `dockerd` keeps `/var/lib/docker`), not on the read-only OS
+filesystem, so there's nothing to worry about with ZimaOS's read-only root.
+Docker's own build cache and image storage live on ZimaOS's writable data
+volume (wherever `dockerd` keeps `/var/lib/docker`), not on the read-only OS
 partition, so `docker compose build` works normally over SSH even though the
 rest of the OS is locked down.
 
@@ -39,11 +41,11 @@ host`) and **PID namespace** (`pid: host`), gets a read-only mount of
 That lets it:
 
 1. Run `ss -tlnp` / `ss -ulnp` to list every listening socket on the host,
-   with the owning process name/PID (this also catches container ports —
+   with the owning process name/PID (this also catches container ports:
    Docker's `docker-proxy` process shows up here for published ports).
    Attributing a socket to a process means reading that process's
    `/proc/<pid>/fd` entries, which the kernel gates behind `CAP_SYS_PTRACE`
-   regardless of running as root. That alone isn't enough, though — Docker's
+   regardless of running as root. That alone isn't enough, though: Docker's
    default AppArmor profile additionally only allows that kind of read
    between two processes running under the *same* profile, so it still
    blocks reading host processes (which run unconfined or under their own
@@ -69,7 +71,7 @@ No data is persisted; every request re-scans live state.
 
    Alternatively, if your ZimaOS App Store build supports "Install a
    Customized App" / compose-based custom installs, you can paste the
-   contents of `docker-compose.yml` there instead of using SSH — just make
+   contents of `docker-compose.yml` there instead of using SSH. Just make
    sure `network_mode: host`, `pid: host`, the `cap_add: [SYS_PTRACE]` and
    `security_opt: [apparmor:unconfined]` entries, and the `docker.sock`
    volume mount survive the import, since the GUI form doesn't always
@@ -91,9 +93,9 @@ No data is persisted; every request re-scans live state.
    docker compose up -d --build
    ```
 
-3. The dashboard is now on **port 8420** on the host itself (because of
-   `network_mode: host`, the compose file doesn't need a `ports:` mapping —
-   it's already bound directly to the host IP):
+3. The dashboard is now on **port 8420** on the host itself. Because of
+   `network_mode: host`, the compose file doesn't need a `ports:` mapping
+   since it's already bound directly to the host IP:
    ```
    http://<zimaos-ip>:8420
    ```
@@ -102,7 +104,7 @@ To change the port, set `PORT` in `docker-compose.yml`'s `environment:`
 before starting it.
 
 `restart: always` means the container comes back after a crash, a `docker
-stop`, or a full host reboot — Docker itself still has to be configured to
+stop`, or a full host reboot. Docker itself still has to be configured to
 start on boot for that last case (`systemctl enable docker` on most Linux
 setups; on ZimaOS this is the case by default since Docker is core to the
 OS, not something you install separately).
@@ -110,7 +112,7 @@ OS, not something you install separately).
 ## Requiring a login (HTTP Basic Auth)
 
 Because this dashboard reveals your running processes and containers,
-**set a username/password before exposing it beyond your LAN** — the app
+**set a username/password before exposing it beyond your LAN**. The app
 then requires HTTP Basic Auth on every route (see `_protect_all_routes` in
 `app.py`).
 
@@ -123,14 +125,14 @@ cp .env.example .env
 docker compose up -d
 ```
 
-`.env` is gitignored on purpose — it's the only place real credentials
+`.env` is gitignored on purpose: it's the only place real credentials
 should ever live, so a `git push` can never leak them. Leaving `.env`
 missing (or its values empty) disables auth entirely, same as before.
 
 ## Exposing it remotely (Cloudflare Tunnel, etc.)
 
 Point your tunnel at `http://<zimaos-ip>:8420` (or `localhost:8420` if
-`cloudflared` runs on the same host). Set up the login above first — combining
+`cloudflared` runs on the same host). Set up the login above first. Combining
 it with a Cloudflare Access policy on the tunnel hostname is recommended for
 defense in depth.
 
@@ -138,11 +140,11 @@ defense in depth.
 
 - `pid: host`, `network_mode: host`, and the Docker socket mount together
   give this container visibility into (and API control over) everything
-  Docker manages on the host — comparable to root access. Only run it on
+  Docker manages on the host, comparable to root access. Only run it on
   hosts you trust, and don't expose it without authentication.
 - The Docker socket is mounted `:ro`, which stops the mount itself from
   being modified, but a process that can reach the socket still gets full
-  Docker API access (create/stop containers, mount host paths, etc.) — the
+  Docker API access (create/stop containers, mount host paths, etc.); the
   `:ro` flag is not a security boundary by itself. This app only ever calls
   read-only Docker API methods, but keep that in mind if you extend it.
 
@@ -159,9 +161,9 @@ what your local machine's Docker daemon and `ss` can see.
 
 ## API
 
-- `GET /api/ports` — merged list of listening ports with owner info.
-- `GET /api/containers` — all containers with published + internal ports.
-- `GET /api/check/<port>?proto=tcp|udp` — is this port in use, and by what.
-- `GET /api/free-ports?start=8000&end=9000&proto=tcp&limit=10` — next free
+- `GET /api/ports`: merged list of listening ports with owner info.
+- `GET /api/containers`: all containers with published + internal ports.
+- `GET /api/check/<port>?proto=tcp|udp`: is this port in use, and by what.
+- `GET /api/free-ports?start=8000&end=9000&proto=tcp&limit=10`: next free
   ports in a range.
-- `GET /api/health` — liveness check.
+- `GET /api/health`: liveness check.
