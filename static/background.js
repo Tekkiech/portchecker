@@ -63,7 +63,7 @@ function initScene(canvas) {
   pointsGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 
   const pointsMaterial = new THREE.PointsMaterial({
-    color: 0x8fb3ff,
+    color: 0xe2793d,
     size: 0.16,
     transparent: true,
     opacity: 0.85,
@@ -77,7 +77,7 @@ function initScene(canvas) {
   const lineGeometry = new THREE.BufferGeometry();
   lineGeometry.setAttribute("position", new THREE.BufferAttribute(linePositions, 3));
   const lineMaterial = new THREE.LineBasicMaterial({
-    color: 0x5b8cff,
+    color: 0xb85c2e,
     transparent: true,
     opacity: 0.12,
   });

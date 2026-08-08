@@ -156,12 +156,12 @@
   function playEntrance() {
     if (!animationsEnabled) return;
     gsap.set([".hero-title", ".hero-sub", ".stat-card", ".tool-card", ".table-card"], { clearProps: "opacity,transform" });
-    const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-    tl.from(".hero-title", { y: 24, opacity: 0, duration: 0.6 })
-      .from(".hero-sub", { y: 16, opacity: 0, duration: 0.5 }, "-=0.4")
-      .from(".stat-card", { y: 18, opacity: 0, duration: 0.5, stagger: 0.06 }, "-=0.25")
-      .from(".tool-card", { y: 18, opacity: 0, duration: 0.5, stagger: 0.08 }, "-=0.3")
-      .from(".table-card", { y: 18, opacity: 0, duration: 0.5 }, "-=0.3");
+    const tl = gsap.timeline({ defaults: { ease: "power2.out" } });
+    tl.from(".hero-title", { y: 10, opacity: 0, duration: 0.35 })
+      .from(".hero-sub", { y: 8, opacity: 0, duration: 0.3 }, "-=0.2")
+      .from(".stat-card", { y: 8, opacity: 0, duration: 0.3, stagger: 0.04 }, "-=0.15")
+      .from(".tool-card", { y: 8, opacity: 0, duration: 0.3, stagger: 0.05 }, "-=0.2")
+      .from(".table-card", { y: 8, opacity: 0, duration: 0.3 }, "-=0.2");
   }
 
   /* ---------------- stats ---------------- */
