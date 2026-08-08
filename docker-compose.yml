@@ -23,7 +23,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - PORT=8420
-      # Uncomment to require a login before the dashboard loads (recommended
-      # if this is reachable through a Cloudflare Tunnel or similar):
-      # - AUTH_USERNAME=admin
-      # - AUTH_PASSWORD=change-me
+      # Require a login before the dashboard loads (recommended if this is
+      # reachable through a Cloudflare Tunnel or similar). Values come from
+      # a local .env file next to this compose file - see .env.example -
+      # never hardcode real credentials here, since this file is checked
+      # into git. Both default to empty, which leaves auth disabled exactly
+      # like before.
+      - AUTH_USERNAME=${AUTH_USERNAME:-}
+      - AUTH_PASSWORD=${AUTH_PASSWORD:-}

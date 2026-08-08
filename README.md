@@ -107,14 +107,32 @@ start on boot for that last case (`systemctl enable docker` on most Linux
 setups; on ZimaOS this is the case by default since Docker is core to the
 OS, not something you install separately).
 
+## Requiring a login (HTTP Basic Auth)
+
+Because this dashboard reveals your running processes and containers,
+**set a username/password before exposing it beyond your LAN** — the app
+then requires HTTP Basic Auth on every route (see `_protect_all_routes` in
+`app.py`).
+
+Credentials come from `AUTH_USERNAME`/`AUTH_PASSWORD`, sourced from a local
+`.env` file next to `docker-compose.yml`, not from the compose file itself:
+
+```bash
+cp .env.example .env
+# edit .env with a real username/password
+docker compose up -d
+```
+
+`.env` is gitignored on purpose — it's the only place real credentials
+should ever live, so a `git push` can never leak them. Leaving `.env`
+missing (or its values empty) disables auth entirely, same as before.
+
 ## Exposing it remotely (Cloudflare Tunnel, etc.)
 
 Point your tunnel at `http://<zimaos-ip>:8420` (or `localhost:8420` if
-`cloudflared` runs on the same host). Because this dashboard reveals your
-running processes and containers, **set `AUTH_USERNAME`/`AUTH_PASSWORD` in
-the compose file** before exposing it beyond your LAN — the app will then
-require HTTP Basic Auth on every route. Combining that with a Cloudflare
-Access policy on the tunnel hostname is recommended for defense in depth.
+`cloudflared` runs on the same host). Set up the login above first — combining
+it with a Cloudflare Access policy on the tunnel hostname is recommended for
+defense in depth.
 
 ## Security notes
 
