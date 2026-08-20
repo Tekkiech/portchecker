@@ -6,24 +6,27 @@ A small self-hosted dashboard for ZimaOS (or any Docker host) that shows:
 
 - **Every port currently listening on the host** (TCP + UDP), not just ones
   Docker published.
-- **Which container owns each port**, cross-referenced from the Docker API.
+- **Which container owns each port**, cross-referenced from the Docker API,
+  and whether a published port is actually listening or just claimed in
+  Docker's config (including bindings a *stopped* container still holds and
+  will take back on restart).
 - **Host services** using a port outside of Docker (SSH, the ZimaOS UI
   itself, etc.), so you know why a port is unavailable even when no
   container claims it.
 - A **quick check** ("is port 8080 free?") and a **free-port finder** for a
   range, so you stop hitting `port is already allocated` when installing a
   new container.
-- Ports and containers are grouped into **collapsible sections** (Docker
-  Containers / Host Services, and one card per container) with per-group
-  "show more" paging, so the page stays short even with a hundred open
-  ports or a few dozen containers.
+- A **needs-attention** panel that surfaces sockets `ss` couldn't attribute
+  to a process, and ports a stopped container still has claimed.
+- Four views: Overview (stats, a port-map plotted across the port space,
+  the tools above), Ports (a filterable/sortable table of every socket),
+  Containers (a master-detail list with each container's bindings), and
+  Tools (the same checks, full-size, plus the raw API reference).
 
-The UI is a dark dashboard with a lightweight Three.js particle-network
-background and GSAP-driven entrances/accordions/counters. GSAP, Three.js,
-and the two typefaces (Inter, Space Grotesk) are vendored under
-`static/vendor/` and `static/fonts/`. No CDN calls, no build step, so it
-works offline behind a Cloudflare Tunnel with nothing to `npm install` on
-the read-only host.
+The UI is a plain instrument-panel dashboard: no build step, no framework.
+Instrument Sans and JetBrains Mono are vendored under `static/fonts/`. No
+CDN calls, so it works offline behind a Cloudflare Tunnel with nothing to
+`npm install` on the read-only host.
 
 It runs entirely as a container itself and never writes to the host
 filesystem, so there's nothing to worry about with ZimaOS's read-only root.
@@ -161,9 +164,17 @@ what your local machine's Docker daemon and `ss` can see.
 
 ## API
 
-- `GET /api/ports`: merged list of listening ports with owner info.
-- `GET /api/containers`: all containers with published + internal ports.
+- `GET /api/ports`: merged list of listening ports with owner info, plus a
+  `scan_ms` timing and summary counts.
+- `GET /api/containers`: all containers with published + internal ports,
+  network mode, and uptime.
 - `GET /api/check/<port>?proto=tcp|udp`: is this port in use, and by what.
+  If it's free, `claimed_by` names the stopped container still holding it,
+  or `null`.
 - `GET /api/free-ports?start=8000&end=9000&proto=tcp&limit=10`: next free
-  ports in a range.
+  ports in a range, plus `claimed`: which of them are nonetheless held by a
+  stopped container.
+- `GET /api/attention`: unattributed sockets and stopped-container port
+  claims, the same list the Overview "Needs attention" card shows.
+- `GET /api/host`: hostname, Docker version, and host uptime.
 - `GET /api/health`: liveness check.
