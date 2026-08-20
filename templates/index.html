@@ -3,127 +3,243 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Port Checker · ZimaOS</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23e2793d'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%231a0f06'/%3E%3C/svg%3E">
+  <title>portchecker</title>
+  <meta name="description" content="Live host and container port map for ZimaOS / Docker hosts.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%238a4b2a'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%23ffffff'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <canvas id="bg-canvas" aria-hidden="true"></canvas>
-  <div class="grain" aria-hidden="true"></div>
+<div class="shell" id="shell">
 
-  <header class="topbar">
+  <aside class="rail">
     <div class="brand">
-      <span class="brand-mark">
-        <span class="pulse-dot"></span>
-      </span>
-      <div class="brand-text">
-        <h1>Port<span class="grad-text">Checker</span></h1>
-        <span class="brand-sub">ZimaOS · live host &amp; container map</span>
+      <div class="brand-mark"><span></span></div>
+      <div>
+        <div class="brand-name">portchecker</div>
+        <div class="brand-host" id="brand-host">&nbsp;</div>
       </div>
     </div>
-    <div class="topbar-actions">
-      <span id="last-updated" class="last-updated">—</span>
-      <label class="switch">
-        <input type="checkbox" id="auto-refresh" checked>
-        <span class="switch-track"><span class="switch-thumb"></span></span>
-        <span class="switch-label">Auto-refresh</span>
-      </label>
-      <button id="refresh-btn" class="btn btn-ghost">
-        <svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0012 4a8 8 0 108 8h-2a6 6 0 11-1.76-4.24L13 11h7V4l-2.35 2.35z"/></svg>
-        Refresh
+
+    <nav class="nav" id="nav" aria-label="Views"></nav>
+
+    <div class="host-box">
+      <div class="host-box-title">Host</div>
+      <div id="host-meta"></div>
+    </div>
+
+    <div class="rail-foot">
+      <button class="toggle-row" id="auto-refresh-toggle" type="button" aria-pressed="true">
+        <span class="switch-track" data-on="true"><span class="switch-thumb"></span></span>
+        Auto-refresh &middot; 15s
       </button>
+      <button class="toggle-row" id="theme-toggle" type="button">
+        <span class="theme-glyph" id="theme-glyph">&#9679;</span>
+        <span id="theme-label">Dark theme</span>
+      </button>
+      <div class="rail-note">Reads host sockets + Docker. Writes nothing to disk.</div>
     </div>
-  </header>
+  </aside>
 
-  <div id="docker-warning" class="banner banner-warn hidden"></div>
-  <div id="fetch-error-banner" class="banner banner-bad hidden"></div>
-
-  <main>
-    <div class="dash-rail">
-      <section class="hero">
-        <h2 class="hero-title">Every port,<br><span class="grad-text">accounted for.</span></h2>
-        <p class="hero-sub">Live visibility into every listening port on your ZimaOS box, host services and Docker containers alike, so the next install never collides.</p>
-      </section>
-
-      <section class="stats" id="stats"></section>
-
-      <div class="tools-grid">
-        <section class="card tool-card">
-          <div class="card-header">
-            <h3>Quick port check</h3>
-            <p>See instantly whether a port is free before you spin up a new container.</p>
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-row">
+        <div class="topbar-brand">
+          <div class="brand-mark"><span></span></div>
+        </div>
+        <div class="topbar-titles">
+          <h1 class="view-title" id="view-title">Overview</h1>
+          <p class="view-sub" id="view-sub">&nbsp;</p>
+        </div>
+        <div class="topbar-actions">
+          <div class="scan-indicator">
+            <span class="live-dot"></span>
+            <span id="scan-at">&mdash;</span>
           </div>
-          <div class="port-check">
-            <div class="field">
-              <input type="number" id="check-port-input" placeholder="e.g. 8080" min="1" max="65535">
-            </div>
-            <div class="segmented" data-target="check-proto">
-              <button class="segmented-opt active" data-value="tcp">TCP</button>
-              <button class="segmented-opt" data-value="udp">UDP</button>
-            </div>
-            <button id="check-port-btn" class="btn btn-primary">Check</button>
-          </div>
-          <div id="check-result" class="check-result"></div>
-        </section>
+          <button class="btn btn-rescan" id="rescan-btn" type="button">Rescan</button>
+        </div>
+      </div>
+      <nav class="pill-nav" id="pill-nav" aria-label="Views"></nav>
+      <div class="sweep-track"><div class="sweep-bar" id="sweep-bar" hidden></div></div>
+    </header>
 
-        <section class="card tool-card">
-          <div class="card-header">
-            <h3>Find a free port</h3>
-            <p>Get the next available ports in a range, for your next container.</p>
-          </div>
-          <div class="port-check">
-            <div class="field field-sm"><input type="number" id="range-start" placeholder="Start" value="8000"></div>
-            <div class="field field-sm"><input type="number" id="range-end" placeholder="End" value="9000"></div>
-            <div class="segmented" data-target="range-proto">
-              <button class="segmented-opt active" data-value="tcp">TCP</button>
-              <button class="segmented-opt" data-value="udp">UDP</button>
-            </div>
-            <button id="find-free-btn" class="btn btn-primary">Find</button>
-          </div>
-          <div id="free-ports-result" class="free-ports"></div>
-        </section>
+    <div class="banner-offline" id="offline-banner" hidden>
+      <span class="mark">!</span>
+      <div>
+        <strong>Docker socket unreachable</strong>
+        <p>Host sockets are still listed, but ports can't be attributed to containers. Check that <code>/var/run/docker.sock</code> is mounted and the container has <code>SYS_PTRACE</code>.</p>
       </div>
     </div>
 
-    <div class="dash-main">
-      <section class="card table-card">
-        <div class="table-card-top">
-          <div class="tabs">
-            <button class="tab active" data-tab="ports">All Listening Ports</button>
-            <button class="tab" data-tab="containers">By Container</button>
-          </div>
-          <button id="toggle-all-btn" class="btn btn-ghost btn-sm">Collapse all</button>
-        </div>
+    <div id="fetch-error-banner" class="banner-offline" hidden></div>
 
-        <div class="tab-panel active" id="panel-ports">
-          <div class="table-toolbar">
-            <div class="search-field">
-              <svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 10-.7.7l.27.28v.79l5 5L20.49 19l-5-5zm-6 0A4.5 4.5 0 1114 9.5 4.5 4.5 0 019.5 14z"/></svg>
-              <input type="search" id="ports-search" placeholder="Filter by port, container, image, process...">
+    <section class="view" id="view-overview" data-view="overview">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="tiles" id="tiles"></div>
+
+        <div class="card card-pad">
+          <div class="portmap-head">
+            <div>
+              <div class="portmap-title">Port map</div>
+              <div class="portmap-desc">Every bound socket, plotted across the port space.</div>
+            </div>
+            <div class="legend">
+              <div class="legend-item"><span class="legend-swatch" style="background:var(--accent)"></span>Container</div>
+              <div class="legend-item"><span class="legend-swatch" style="background:var(--ink-3)"></span>Host service</div>
+              <div class="legend-item"><span class="legend-swatch" style="background:var(--warn)"></span>Unattributed</div>
             </div>
           </div>
-          <div id="groups-ports" class="groups"></div>
+          <div class="bands" id="bands"></div>
         </div>
 
-        <div class="tab-panel" id="panel-containers">
-          <div class="table-toolbar">
-            <div class="search-field">
-              <svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 10-.7.7l.27.28v.79l5 5L20.49 19l-5-5zm-6 0A4.5 4.5 0 1114 9.5 4.5 4.5 0 019.5 14z"/></svg>
-              <input type="search" id="containers-search" placeholder="Filter by name, image...">
+        <div class="grid-3">
+          <div class="card card-pad">
+            <div class="card-title">Quick check</div>
+            <div class="card-desc">Is a port free before you publish it?</div>
+            <div class="tool-row">
+              <input class="field" id="ov-check-port" inputmode="numeric" placeholder="8080" style="flex:1 1 90px">
+              <div class="segmented" data-target="ov-check-proto">
+                <button class="segmented-opt" data-value="tcp" aria-pressed="true">TCP</button>
+                <button class="segmented-opt" data-value="udp" aria-pressed="false">UDP</button>
+              </div>
+              <button class="btn btn-primary" id="ov-check-btn" type="button">Check</button>
             </div>
+            <div id="ov-check-result"></div>
           </div>
-          <div id="groups-containers" class="groups"></div>
+
+          <div class="card card-pad">
+            <div class="card-title">Find a free port</div>
+            <div class="card-desc">Next unbound ports in a range.</div>
+            <div class="tool-row">
+              <input class="field" id="ov-range-start" inputmode="numeric" value="8000" style="flex:1 1 68px">
+              <input class="field" id="ov-range-end" inputmode="numeric" value="9000" style="flex:1 1 68px">
+              <button class="btn btn-primary" id="ov-find-btn" type="button">Find</button>
+            </div>
+            <div id="ov-find-result"></div>
+          </div>
+
+          <div class="card" style="padding:15px 16px 6px">
+            <div class="card-title">Needs attention</div>
+            <div class="card-desc" id="attn-count">&nbsp;</div>
+            <div id="attn-list"></div>
+          </div>
         </div>
-      </section>
-    </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-ports" data-view="ports" hidden>
+      <div class="card ports-card">
+        <div class="ports-toolbar">
+          <div class="search-field">
+            <span class="slash">/</span>
+            <input type="search" id="ports-search" placeholder="port, container, image, process">
+          </div>
+          <div class="segmented" data-target="ports-proto">
+            <button class="segmented-opt" data-value="all" aria-pressed="true">All</button>
+            <button class="segmented-opt" data-value="tcp" aria-pressed="false">TCP</button>
+            <button class="segmented-opt" data-value="udp" aria-pressed="false">UDP</button>
+          </div>
+          <div class="segmented" data-target="ports-kind">
+            <button class="segmented-opt" data-value="all" aria-pressed="true">Any owner</button>
+            <button class="segmented-opt" data-value="container" aria-pressed="false">Containers</button>
+            <button class="segmented-opt" data-value="host" aria-pressed="false">Host</button>
+            <button class="segmented-opt" data-value="unknown" aria-pressed="false">Unknown</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="ports-table">
+            <thead>
+              <tr>
+                <th data-sort="port">Port <span class="sort-arrow"></span></th>
+                <th>Proto</th>
+                <th>Bind address</th>
+                <th data-sort="owner">Owner <span class="sort-arrow"></span></th>
+                <th>Type</th>
+              </tr>
+            </thead>
+            <tbody id="ports-tbody"></tbody>
+          </table>
+        </div>
+        <div class="ports-empty" id="ports-empty" hidden>
+          <p id="ports-empty-msg"></p>
+          <button class="btn btn-rescan" id="ports-clear-btn" type="button" style="margin-top:12px">Reset filters</button>
+        </div>
+        <div class="ports-foot">
+          <span id="ports-summary"></span>
+          <span>ss -tlnp / ss -ulnp</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-containers" data-view="containers" hidden>
+      <div id="containers-offline" class="containers-offline" hidden>
+        <p>no container data</p>
+        <div class="hint">The Docker API is unreachable, so nothing can be attributed. Host sockets are still listed under Ports.</div>
+      </div>
+      <div id="containers-online" class="containers-layout">
+        <div class="clist-card">
+          <div class="clist-search">
+            <span class="slash" style="font-family:var(--ff-mono);font-size:12px;color:var(--ink-3)">/</span>
+            <input type="search" id="containers-search" placeholder="name or image">
+          </div>
+          <div class="clist" id="clist"></div>
+        </div>
+        <div id="container-detail"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-tools" data-view="tools" hidden>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="grid-2">
+          <div class="card" style="padding:17px 18px">
+            <div style="font-size:15px;font-weight:600">Port availability</div>
+            <div class="card-desc" style="margin-bottom:15px">Checks the live socket table and Docker's binding map, including ports claimed by stopped containers.</div>
+            <div class="tool-row">
+              <input class="field" id="tl-check-port" inputmode="numeric" placeholder="8080" style="flex:1 1 100px;font-size:14px;padding:9px 12px">
+              <div class="segmented" data-target="tl-check-proto">
+                <button class="segmented-opt" data-value="tcp" aria-pressed="true">TCP</button>
+                <button class="segmented-opt" data-value="udp" aria-pressed="false">UDP</button>
+              </div>
+              <button class="btn btn-primary" id="tl-check-btn" type="button" style="padding:9px 18px;font-size:13px">Check</button>
+            </div>
+            <div id="tl-check-result"></div>
+          </div>
+
+          <div class="card" style="padding:17px 18px">
+            <div style="font-size:15px;font-weight:600">Free port finder</div>
+            <div class="card-desc" style="margin-bottom:15px">Walks a range and returns the first ten ports nothing is bound to.</div>
+            <div class="tool-row" style="align-items:center">
+              <input class="field" id="tl-range-start" inputmode="numeric" value="8000" style="flex:1 1 78px;font-size:14px;padding:9px 12px">
+              <span style="font-family:var(--ff-mono);color:var(--ink-3);font-size:13px">&ndash;</span>
+              <input class="field" id="tl-range-end" inputmode="numeric" value="9000" style="flex:1 1 78px;font-size:14px;padding:9px 12px">
+              <div class="segmented" data-target="tl-range-proto">
+                <button class="segmented-opt" data-value="tcp" aria-pressed="true">TCP</button>
+                <button class="segmented-opt" data-value="udp" aria-pressed="false">UDP</button>
+              </div>
+              <button class="btn btn-primary" id="tl-find-btn" type="button" style="padding:9px 18px;font-size:13px">Find</button>
+            </div>
+            <div id="tl-find-result"></div>
+          </div>
+        </div>
+
+        <div class="card" style="padding:15px 18px">
+          <div class="tile-label" style="color:var(--ink-3);margin-bottom:4px">Endpoints</div>
+          <div class="card-desc" style="margin-bottom:12px">The same data, straight from the API.</div>
+          <div class="api-list">
+            <div class="api-row"><span class="api-path">GET /api/ports</span><span class="api-desc">merged sockets with owner attribution</span></div>
+            <div class="api-row"><span class="api-path">GET /api/containers</span><span class="api-desc">published + internal bindings</span></div>
+            <div class="api-row"><span class="api-path">GET /api/check/:port</span><span class="api-desc">in use, and by what</span></div>
+            <div class="api-row"><span class="api-path">GET /api/free-ports</span><span class="api-desc">next free ports in a range</span></div>
+            <div class="api-row"><span class="api-path">GET /api/attention</span><span class="api-desc">unattributed sockets + stopped-container claims</span></div>
+            <div class="api-row"><span class="api-path">GET /api/host</span><span class="api-desc">hostname, Docker version, uptime</span></div>
+            <div class="api-row"><span class="api-path">GET /api/health</span><span class="api-desc">liveness</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
+</div>
 
-  <footer>
-    <span>Port Checker for ZimaOS. Reads host sockets + Docker, writes nothing to disk.</span>
-  </footer>
-
-  <script src="{{ url_for('static', filename='vendor/gsap.min.js') }}"></script>
-  <script type="module" src="{{ url_for('static', filename='background.js') }}"></script>
-  <script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

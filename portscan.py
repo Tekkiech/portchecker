@@ -3,12 +3,37 @@ bindings (via the Docker API), then merges the two into one picture of
 what's using which port and why.
 """
 import re
+import socket
 import subprocess
+from datetime import datetime, timezone
 
 import docker
 from docker.errors import DockerException
 
 SS_USER_RE = re.compile(r'\("([^"]+)",pid=(\d+),fd=(\d+)\)')
+
+
+def _format_duration(seconds):
+    seconds = int(seconds)
+    days, rem = divmod(seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    if days:
+        return f"{days}d {hours:02d}h"
+    if hours:
+        return f"{hours}h {rem // 60:02d}m"
+    return f"{rem // 60}m"
+
+
+def _started_at_uptime(started_at):
+    """Docker's ISO8601 StartedAt, formatted the same way as host uptime."""
+    if not started_at or started_at.startswith("0001-01-01"):
+        return None
+    cleaned = re.sub(r"\.\d+", "", started_at).replace("Z", "+00:00")
+    try:
+        started = datetime.fromisoformat(cleaned)
+    except ValueError:
+        return None
+    return _format_duration((datetime.now(timezone.utc) - started).total_seconds())
 
 
 def _run_ss(flag):
@@ -116,11 +141,15 @@ def get_containers():
                         "container_port": int(container_port),
                         "proto": proto or "tcp",
                     })
+            status = attrs.get("State", {}).get("Status", "unknown")
             containers.append({
                 "name": c.name,
                 "id": c.short_id,
                 "image": image,
-                "status": attrs.get("State", {}).get("Status", "unknown"),
+                "status": status,
+                "network": attrs.get("HostConfig", {}).get("NetworkMode", "unknown"),
+                "uptime": _started_at_uptime(attrs.get("State", {}).get("StartedAt"))
+                    if status == "running" else None,
                 "published_ports": sorted(published, key=lambda p: p["host_port"]),
                 "internal_ports": sorted(internal_only, key=lambda p: p["container_port"]),
             })
@@ -211,3 +240,88 @@ def find_free_ports(start, end, proto="tcp", limit=10):
             if len(free) >= limit:
                 break
     return free
+
+
+def find_stopped_claims(containers, listening):
+    """Ports a *stopped* container still has published in Docker's config,
+    that nothing is currently listening on. build_port_table() only maps
+    running containers into its owner lookup, so these never show up there
+    - they're free right now, but will collide the moment the container
+    restarts."""
+    live = {(p["proto"], p["port"]) for p in listening}
+    claims = []
+    for c in containers:
+        if c["status"] == "running":
+            continue
+        for p in c["published_ports"]:
+            if (p["proto"], p["host_port"]) not in live:
+                claims.append({
+                    "proto": p["proto"],
+                    "port": p["host_port"],
+                    "container": c["name"],
+                    "image": c["image"],
+                })
+    return claims
+
+
+def claimed_by_stopped(port, proto):
+    """Is this specific free port held by a stopped container? None if not."""
+    containers, _err = get_containers()
+    if not containers:
+        return None
+    for c in find_stopped_claims(containers, get_listening_ports()):
+        if c["port"] == port and c["proto"] == proto:
+            return {"container": c["container"], "image": c["image"]}
+    return None
+
+
+def claimed_in_range(start, end, proto):
+    containers, _err = get_containers()
+    if not containers:
+        return []
+    claims = find_stopped_claims(containers, get_listening_ports())
+    return [c for c in claims if c["proto"] == proto and start <= c["port"] <= end]
+
+
+def get_attention_items():
+    """Things on this host worth a second look: sockets ss couldn't
+    attribute to a process, and ports stopped containers still hold."""
+    rows, containers, _err = build_port_table()
+    items = []
+    for r in rows:
+        if r["owner_type"] == "host" and all(o.get("process") == "unknown" for o in r["owners"]):
+            items.append({
+                "port": r["port"], "proto": r["proto"], "kind": "unattributed",
+                "title": "Socket with no owner",
+                "body": f"Port {r['port']}/{r['proto']} is bound but no process could be read. "
+                        "ss needs CAP_SYS_PTRACE and an unconfined AppArmor profile on this "
+                        "container to attribute it (see the README).",
+            })
+    if containers:
+        for c in find_stopped_claims(containers, get_listening_ports()):
+            items.append({
+                "port": c["port"], "proto": c["proto"], "kind": "stopped_claim",
+                "title": "Claimed by a stopped container",
+                "body": f"{c['container']} is stopped but still holds "
+                        f"{c['port']}/{c['proto']}. Starting anything else here will "
+                        "collide the moment it restarts.",
+            })
+    return items
+
+
+def get_host_info():
+    hostname = socket.gethostname()
+    docker_version = None
+    client = _docker_client()
+    if client is not None:
+        try:
+            docker_version = client.version().get("Version")
+        except DockerException:
+            docker_version = None
+    uptime = None
+    try:
+        with open("/proc/uptime") as f:
+            uptime = _format_duration(float(f.read().split()[0]))
+    except OSError:
+        pass
+    return {"hostname": hostname, "docker_version": docker_version, "uptime": uptime}

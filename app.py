@@ -1,5 +1,6 @@
 import os
 import secrets
+import time
 
 from flask import Flask, jsonify, render_template, request, Response
 
@@ -42,11 +43,14 @@ def favicon():
 
 @app.route("/api/ports")
 def api_ports():
+    started = time.perf_counter()
     rows, containers, docker_error = portscan.build_port_table()
+    scan_ms = round((time.perf_counter() - started) * 1000)
     return jsonify({
         "ports": rows,
         "docker_available": docker_error is None,
         "docker_error": docker_error,
+        "scan_ms": scan_ms,
         "summary": {
             "total": len(rows),
             "tcp": sum(1 for r in rows if r["proto"] == "tcp"),
@@ -73,10 +77,14 @@ def api_containers():
 def api_check(port):
     proto = request.args.get("proto")
     matches = portscan.check_port(port, proto=proto)
+    claimed_by = None
+    if not matches and proto:
+        claimed_by = portscan.claimed_by_stopped(port, proto)
     return jsonify({
         "port": port,
         "in_use": bool(matches),
         "matches": matches,
+        "claimed_by": claimed_by,
     })
 
 
@@ -94,7 +102,21 @@ def api_free_ports():
     if end - start > 200000:
         return jsonify({"error": "range too large"}), 400
     free = portscan.find_free_ports(start, end, proto=proto, limit=limit)
-    return jsonify({"start": start, "end": end, "proto": proto, "free_ports": free})
+    claimed = portscan.claimed_in_range(start, end, proto)
+    return jsonify({
+        "start": start, "end": end, "proto": proto,
+        "free_ports": free, "claimed": claimed,
+    })
+
+
+@app.route("/api/attention")
+def api_attention():
+    return jsonify({"items": portscan.get_attention_items()})
+
+
+@app.route("/api/host")
+def api_host():
+    return jsonify(portscan.get_host_info())
 
 
 @app.route("/api/health")
